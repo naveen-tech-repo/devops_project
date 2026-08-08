@@ -1,5 +1,5 @@
 # ============================
-# Runtime Image
+# Runtime Image optiisation
 # ============================
 
 FROM eclipse-temurin:17-jre-alpine
