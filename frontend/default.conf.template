@@ -1,0 +1,50 @@
+# Rendered by the nginx image entrypoint into /etc/nginx/conf.d/default.conf. It contains
+# no environment placeholders — the DNS resolver is supplied separately by the
+# 05-resolver.sh entrypoint script (see 00-resolver.conf).
+#
+# Why a resolver + variable upstreams instead of a plain proxy_pass:
+#   A literal `proxy_pass http://product-service:8081` resolves the name ONCE, at config
+#   load, and nginx refuses to start if the name isn't resolvable yet. Putting the host in
+#   a variable defers resolution to REQUEST time, so nginx boots regardless of backend
+#   readiness and re-resolves if a Service IP changes. Portable across Docker Compose
+#   (127.0.0.11) and Kubernetes (CoreDNS) because the resolver is auto-detected.
+
+server {
+    listen       8080;
+    server_name  _;
+
+    # The `resolver` directive is supplied at the http level by 00-resolver.conf, which
+    # the 05-resolver.sh entrypoint script generates from /etc/resolv.conf at startup.
+
+    # Kubernetes probes hit this — cheap, never touches a backend.
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # ---- API reverse proxy ----
+    # Host in a variable => runtime DNS resolution (see header note).
+    # No URI after the port, so the full original request path is forwarded unchanged.
+    location /api/products {
+        set $svc product-service;
+        proxy_pass http://$svc:8081;
+        include /etc/nginx/proxy_common.conf;
+    }
+    location /api/orders {
+        set $svc order-service;
+        proxy_pass http://$svc:8082;
+        include /etc/nginx/proxy_common.conf;
+    }
+    location /api/users {
+        set $svc user-service;
+        proxy_pass http://$svc:8083;
+        include /etc/nginx/proxy_common.conf;
+    }
+
+    # ---- static SPA ----
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html;
+        try_files $uri $uri/ /index.html;   # SPA fallback
+    }
+}

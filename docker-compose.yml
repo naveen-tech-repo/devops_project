@@ -1,0 +1,126 @@
+services:
+
+  mongodb:
+    image: mongo:7.0
+    container_name: ecommerce-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-ecomadmin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-ecompassword}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - ecommerce
+
+  product-service:
+    build:
+      context: ./product-service
+    image: ${DOCKERHUB_USERNAME:-local}/product-service:${IMAGE_TAG:-latest}
+    container_name: product-service
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_USERNAME:-ecomadmin}:${MONGO_PASSWORD:-ecompassword}@mongodb:27017/productdb?authSource=admin
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks:
+      - ecommerce
+
+  user-service:
+    build:
+      context: ./user-service
+    image: ${DOCKERHUB_USERNAME:-local}/user-service:${IMAGE_TAG:-latest}
+    container_name: user-service
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_USERNAME:-ecomadmin}:${MONGO_PASSWORD:-ecompassword}@mongodb:27017/userdb?authSource=admin
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8083:8083"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8083/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks:
+      - ecommerce
+
+  order-service:
+    build:
+      context: ./order-service
+    image: ${DOCKERHUB_USERNAME:-local}/order-service:${IMAGE_TAG:-latest}
+    container_name: order-service
+    restart: unless-stopped
+    environment:
+      MONGO_URI: mongodb://${MONGO_USERNAME:-ecomadmin}:${MONGO_PASSWORD:-ecompassword}@mongodb:27017/orderdb?authSource=admin
+      PRODUCT_SERVICE_URL: http://product-service:8081
+      USER_SERVICE_URL: http://user-service:8083
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8082:8082"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8082/actuator/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+    networks:
+      - ecommerce
+
+  frontend:
+    build:
+      context: ./frontend
+    image: ${DOCKERHUB_USERNAME:-local}/frontend:${IMAGE_TAG:-latest}
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    # nginx boots regardless of backend state (runtime DNS resolution), so these are
+    # ordering hints only, not hard gates.
+    depends_on:
+      - product-service
+      - order-service
+      - user-service
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ecommerce
+
+volumes:
+  mongodb-data:
+
+networks:
+  ecommerce:
+    driver: bridge

@@ -1,0 +1,14 @@
+target/
+*.class
+*.jar
+*.log
+
+.env
+
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Kustomize build output
+k8s/**/rendered.yaml

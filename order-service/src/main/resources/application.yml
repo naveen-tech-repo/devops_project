@@ -1,0 +1,38 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: order-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/orderdb}
+      auto-index-creation: true
+
+# Downstream service locations. In Kubernetes these resolve to ClusterIP Services in the
+# same namespace; in Docker Compose they resolve to container names.
+services:
+  product:
+    url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+  user:
+    url: ${USER_SERVICE_URL:http://localhost:8083}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+logging:
+  level:
+    com.ecommerce: ${LOG_LEVEL:INFO}

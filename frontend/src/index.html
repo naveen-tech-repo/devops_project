@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>E-Commerce Console</title>
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #1e293b; --panel2: #273449; --line: #334155;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --accent2: #22c55e;
+      --danger: #ef4444; --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.5;
+    }
+    header {
+      padding: 20px 24px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    header .env { font-size: 12px; color: var(--muted); }
+    #status { margin-left: auto; font-size: 13px; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .ok { background: var(--accent2); } .bad { background: var(--danger); }
+    nav { display: flex; gap: 4px; padding: 0 24px; border-bottom: 1px solid var(--line); }
+    nav button {
+      background: none; border: none; color: var(--muted); padding: 12px 16px;
+      cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent;
+    }
+    nav button.active { color: var(--text); border-bottom-color: var(--accent); }
+    main { padding: 24px; max-width: 1000px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+    .card h2 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    input, select {
+      width: 100%; padding: 9px 10px; background: var(--panel2); border: 1px solid var(--line);
+      border-radius: 8px; color: var(--text); font-size: 14px;
+    }
+    button.primary {
+      margin-top: 16px; width: 100%; padding: 10px; background: var(--accent); color: #04263a;
+      border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px;
+    }
+    button.primary:hover { filter: brightness(1.08); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    td.mono, .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); }
+    .del { background: none; border: 1px solid var(--line); color: var(--danger); border-radius: 6px; cursor: pointer; padding: 3px 8px; font-size: 12px; }
+    .empty { color: var(--muted); font-size: 13px; padding: 12px 0; }
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; background: var(--panel2);
+      border: 1px solid var(--line); border-left: 3px solid var(--accent2);
+      padding: 12px 16px; border-radius: 8px; font-size: 13px; max-width: 360px;
+      opacity: 0; transform: translateY(8px); transition: .2s;
+    }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.err { border-left-color: var(--danger); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🛒 E-Commerce Console</h1>
+    <span class="env" id="env-label">connecting…</span>
+    <span id="status"></span>
+  </header>
+
+  <nav>
+    <button data-tab="products" class="active">Products</button>
+    <button data-tab="users">Users</button>
+    <button data-tab="orders">Orders</button>
+  </nav>
+
+  <main>
+    <!-- PRODUCTS -->
+    <section id="tab-products" class="grid">
+      <div class="card">
+        <h2>New product</h2>
+        <form id="product-form">
+          <label>Name</label><input name="name" required placeholder="Mechanical Keyboard" />
+          <label>Description</label><input name="description" placeholder="87-key hot-swap" />
+          <label>Price</label><input name="price" type="number" step="0.01" min="0" required placeholder="89.99" />
+          <label>Quantity in stock</label><input name="quantity" type="number" min="0" required placeholder="25" />
+          <button class="primary" type="submit">Create product</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Catalogue</h2>
+        <div id="product-list"></div>
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section id="tab-users" class="grid" hidden>
+      <div class="card">
+        <h2>New user</h2>
+        <form id="user-form">
+          <label>Name</label><input name="name" required placeholder="Ada Lovelace" />
+          <label>Email</label><input name="email" type="email" required placeholder="ada@example.com" />
+          <label>Phone</label><input name="phone" placeholder="555-0100" />
+          <button class="primary" type="submit">Create user</button>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Users</h2>
+        <div id="user-list"></div>
+      </div>
+    </section>
+
+    <!-- ORDERS -->
+    <section id="tab-orders" class="grid" hidden>
+      <div class="card">
+        <h2>Place order</h2>
+        <form id="order-form">
+          <label>User</label><select name="userId" id="order-user" required></select>
+          <label>Product</label><select name="productId" id="order-product" required></select>
+          <label>Quantity</label><input name="quantity" type="number" min="1" value="1" required />
+          <button class="primary" type="submit">Place order</button>
+          <p class="hint">order-service validates the user &amp; product by calling the other two services, then checks stock.</p>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Orders</h2>
+        <div id="order-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Same-origin: the browser only ever talks to this frontend. nginx reverse-proxies
+    // /api/* to the backend Services, so there is no CORS and no hardcoded backend host.
+    const API = {
+      products: '/api/products',
+      users: '/api/users',
+      orders: '/api/orders',
+    };
+
+    const $ = (s, r = document) => r.querySelector(s);
+    const toast = (msg, isErr = false) => {
+      const t = $('#toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (isErr ? ' err' : '');
+      setTimeout(() => (t.className = 'toast'), 3200);
+    };
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+      });
+      if (!res.ok) {
+        let detail = res.status + ' ' + res.statusText;
+        try { const b = await res.json(); detail = Object.values(b).join('; ') || detail; } catch {}
+        throw new Error(detail);
+      }
+      return res.status === 204 ? null : res.json();
+    }
+
+    // ---- tabs ----
+    document.querySelectorAll('nav button').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ['products', 'users', 'orders'].forEach(t =>
+          ($('#tab-' + t).hidden = t !== btn.dataset.tab));
+        refresh(btn.dataset.tab);
+      };
+    });
+
+    // ---- products ----
+    $('#product-form').onsubmit = async e => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api(API.products, { method: 'POST', body: JSON.stringify({
+          name: f.get('name'), description: f.get('description'),
+          price: Number(f.get('price')), quantity: Number(f.get('quantity')),
+        })});
+        e.target.reset(); toast('Product created'); loadProducts();
+      } catch (err) { toast(err.message, true); }
+    };
+    async function loadProducts() {
+      try {
+        const items = await api(API.products);
+        $('#product-list').innerHTML = items.length ? `
+          <table><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th></th></tr></thead>
+          <tbody>${items.map(p => `<tr>
+            <td>${esc(p.name)}<div class="id">${p.id}</div></td>
+            <td>$${Number(p.price).toFixed(2)}</td><td>${p.quantity}</td>
+            <td><button class="del" onclick="delProduct('${p.id}')">delete</button></td>
+          </tr>`).join('')}</tbody></table>` : `<div class="empty">No products yet.</div>`;
+      } catch (err) { $('#product-list').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+    }
+    window.delProduct = async id => {
+      try { await api(API.products + '/' + id, { method: 'DELETE' }); toast('Deleted'); loadProducts(); }
+      catch (err) { toast(err.message, true); }
+    };
+
+    // ---- users ----
+    $('#user-form').onsubmit = async e => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api(API.users, { method: 'POST', body: JSON.stringify({
+          name: f.get('name'), email: f.get('email'), phone: f.get('phone'),
+        })});
+        e.target.reset(); toast('User created'); loadUsers();
+      } catch (err) { toast(err.message, true); }
+    };
+    async function loadUsers() {
+      try {
+        const items = await api(API.users);
+        $('#user-list').innerHTML = items.length ? `
+          <table><thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+          <tbody>${items.map(u => `<tr>
+            <td>${esc(u.name)}<div class="id">${u.id}</div></td>
+            <td>${esc(u.email)}</td>
+            <td><button class="del" onclick="delUser('${u.id}')">delete</button></td>
+          </tr>`).join('')}</tbody></table>` : `<div class="empty">No users yet.</div>`;
+      } catch (err) { $('#user-list').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+    }
+    window.delUser = async id => {
+      try { await api(API.users + '/' + id, { method: 'DELETE' }); toast('Deleted'); loadUsers(); }
+      catch (err) { toast(err.message, true); }
+    };
+
+    // ---- orders ----
+    async function loadOrderOptions() {
+      try {
+        const [users, products] = await Promise.all([api(API.users), api(API.products)]);
+        $('#order-user').innerHTML = users.map(u =>
+          `<option value="${u.id}">${esc(u.name)} — ${esc(u.email)}</option>`).join('')
+          || '<option value="">create a user first</option>';
+        $('#order-product').innerHTML = products.map(p =>
+          `<option value="${p.id}">${esc(p.name)} ($${Number(p.price).toFixed(2)}, ${p.quantity} in stock)</option>`).join('')
+          || '<option value="">create a product first</option>';
+      } catch (err) { toast(err.message, true); }
+    }
+    $('#order-form').onsubmit = async e => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api(API.orders, { method: 'POST', body: JSON.stringify({
+          userId: f.get('userId'), productId: f.get('productId'), quantity: Number(f.get('quantity')),
+        })});
+        toast('Order placed'); loadOrders(); loadOrderOptions();
+      } catch (err) { toast(err.message, true); }
+    };
+    async function loadOrders() {
+      try {
+        const items = await api(API.orders);
+        $('#order-list').innerHTML = items.length ? `
+          <table><thead><tr><th>Product</th><th>Qty</th><th>Total</th><th>Status</th></tr></thead>
+          <tbody>${items.map(o => `<tr>
+            <td>${esc(o.productName)}<div class="id">${esc(o.userEmail || '')}</div></td>
+            <td>${o.quantity}</td><td>$${Number(o.totalPrice).toFixed(2)}</td><td>${esc(o.status)}</td>
+          </tr>`).join('')}</tbody></table>` : `<div class="empty">No orders yet.</div>`;
+      } catch (err) { $('#order-list').innerHTML = `<div class="empty">${esc(err.message)}</div>`; }
+    }
+
+    function refresh(tab) {
+      if (tab === 'products') loadProducts();
+      if (tab === 'users') loadUsers();
+      if (tab === 'orders') { loadOrderOptions(); loadOrders(); }
+    }
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+    // ---- health banner: are the backends reachable through the proxy? ----
+    async function ping() {
+      try {
+        await api(API.products);
+        $('#status').innerHTML = '<span class="dot ok"></span>backends reachable';
+        $('#env-label').textContent = 'connected via nginx proxy';
+      } catch {
+        $('#status').innerHTML = '<span class="dot bad"></span>backend unreachable';
+        $('#env-label').textContent = 'proxy up, backend down';
+      }
+    }
+
+    ping();
+    loadProducts();
+  </script>
+</body>
+</html>
